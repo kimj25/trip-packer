@@ -1,2 +1,4 @@
 # trip-packer
-App to help packing for trip
+CS 361 Project
+
+This App is to help user packing for trip
