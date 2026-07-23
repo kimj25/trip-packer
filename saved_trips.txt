@@ -1,0 +1,8 @@
+===
+destination=paris, france
+departure=03/15/2026
+return=03/25/2026
+items=👗 CLOTHING:^  👚 7 tops^  👖 7 bottoms (pants/skirts)^  👗 1 dress^  👟 comfortable walking shoes^  👠 1 pair dressy shoes^  🧦 10 pairs of underwear and socks^  🧥 1 jacket/sweater^
+⭐ SPECIAL NEEDS ITEMS:^  ⭐ earplugs^  ⭐ medications^
+🎒 ESSENTIALS:^  🧴 Toiletries (shampoo, toothbrush, etc.)^  💊 Medications^  📱 Phone + charger^  💼 Suitcase/backpack^  🗺️ Travel insurance documents^
+🌍 INTERNATIONAL TRAVEL:^  🛂 Passport^  💱 Local currency / notify your bank^  🔌 Travel adapter/converter^  📋 Copies of important documents

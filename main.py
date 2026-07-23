@@ -299,6 +299,11 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
     for item in packing:
         print(item)
     
+    # After displaying the packing list, provide options to save, start a new trip, or go home
+    packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
+
+def packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing):
+    # helper function to display save/new trip/exit options after packing list is generated
     print()
     print("1. 💾 Save List")
     print("2. 🆕 New Trip")
@@ -314,15 +319,126 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         if confirm == "y":
             enter_trip_dates()
         else:
-            packing_list(departure, return_date, duration, destination, travelers, is_international)
+            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
     elif choice == "3":
         confirm = input("⚠️ Going back will lose current list. Continue? [Y/N]: ").strip().lower()
         if confirm == "y":
             home()
         else:
-            packing_list(departure, return_date, duration, destination, travelers, is_international)
+            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
     else:
         print("⚠️ Invalid option. Please try again.")
-        packing_list(departure, return_date, duration, destination, travelers, is_international)
+        packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
+
+def save_list(destination, departure, return_date, packing):
+    # save packing list to a text file
+    filename = "saved_trips.txt"
+    
+    with open(filename, "a") as f:
+        f.write(f"===\n")
+        f.write(f"destination={destination}\n")
+        f.write(f"departure={departure}\n")
+        f.write(f"return={return_date}\n")
+        f.write(f"items={'^'.join(packing)}\n")
+
+    # inform user that list will be saved locally
+    print("⚠️ Will be saved locally on your device only.") 
+    print("✅ Saved!")
+    print()
+    
+    input("Press [Enter] to go back to Home: ")
+    home()
+
+def saved_trips():
+    # display saved trips from the text file
+    print("\nSaved Trips:")
+    print("------------------------------")
+    
+    try:
+        with open("saved_trips.txt", "r") as f:
+            content = f.read()
+        
+        # parse saved trips
+        trips = content.strip().split("===\n")
+        trips = [t for t in trips if t.strip()]  # remove empty
+        
+        if not trips:
+            print("No saved trips yet!")
+            print()
+            input("Press [Enter] to go back to Home: ")
+            home()
+            return
+        
+        # display trips
+        for i, trip in enumerate(trips):
+            lines = trip.strip().split("\n")
+            trip_data = {}
+            for line in lines:
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    trip_data[key] = value
+            print(f"{i+1}. {trip_data.get('destination', 'Unknown')} | {trip_data.get('departure', '')} - {trip_data.get('return', '')}")
+        
+        print(f"{len(trips)+1}. 🏠 Back to Home")
+        print()
+        
+        choice = input("Choose trip to view: ").strip()
+        
+        if choice == str(len(trips)+1):
+            # go back to home
+            home()
+        else:
+            # view selected trip
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(trips):
+                    view_saved_list(trips[idx])
+                else:
+                    print("⚠️ Invalid option. Please try again.")
+                    saved_trips()
+            except ValueError:
+                print("⚠️ Invalid option. Please try again.")
+                saved_trips()
+    
+    except FileNotFoundError:
+        # if no trips have been saved yet, inform the user
+        print("No saved trips yet!")
+        print()
+        input("Press [Enter] to go back to Home: ")
+        home()
+
+def view_saved_list(trip):
+    # view saved packing list of the chosen trip
+    print("\nViewing List")
+    print("------------------------------")
+    
+    lines = trip.strip().split("\n")
+    trip_data = {}
+    for line in lines:
+        if "=" in line:
+            key, value = line.split("=", 1)
+            trip_data[key] = value
+    
+    print(f"📍 {trip_data.get('destination', 'Unknown')}")
+    print(f"📅 {trip_data.get('departure', '')} - {trip_data.get('return', '')}")
+    print()
+    print("Your Packing List:")
+    print("-" * 30)
+    
+    items = trip_data.get('items', '').split('^')
+    for item in items:
+        print(item)
+    
+    print()
+    print("1. 📋 View another trip")
+    print("2. 🏠 Home")
+    print()
+    
+    choice = input("Choose from the above option: ").strip()
+    
+    if choice == "1":
+        saved_trips()
+    else:
+        home()
 if __name__ == "__main__":
     main()
