@@ -59,6 +59,7 @@ def enter_trip_dates():
         duration = (ret - dep).days
         
         if duration <= 0:
+            # if return date is before or same as departure date, prompt user to re-enter
             print("⚠️ Return date must be after departure date. Please try again.")
             enter_trip_dates()
             return
@@ -68,6 +69,7 @@ def enter_trip_dates():
         print(f"Trip duration: {duration} days")
         
     except ValueError:
+        # if the date format is invalid, prompt user to re-enter
         print("⚠️ Invalid date format. Please use MM/DD/YYYY.")
         enter_trip_dates()
         return
@@ -204,7 +206,123 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
         packing_list(departure, return_date, duration, destination, travelers, is_international)
 
 def packing_list(departure, return_date, duration, destination, travelers, is_international):
-    pass
-
+    print("\nPacking List Result [Step 4/4]")
+    print("------------------------------")
+    print(f"Here is your packing list for your trip to {destination}!")
+    print(f"Trip duration: {duration} days")
+    print()
+    
+    packing = []
+    
+    # determine number of outfits based on duration
+    if duration <= 3:
+        outfits = duration
+    elif duration <= 7:
+        outfits = 5
+    else:
+        outfits = 7
+    
+    # clothes based on sex
+    has_female = any(t["sex"].upper() == "F" for t in travelers)
+    has_male = any(t["sex"].upper() == "M" for t in travelers)
+    
+    packing.append("👗 CLOTHING:")
+    if has_female:
+        packing.append(f"  👚 {outfits} tops")
+        packing.append(f"  👖 {outfits} bottoms (pants/skirts)")
+        packing.append(f"  👗 1 dress")
+        packing.append(f"  👟 comfortable walking shoes")
+        packing.append(f"  👠 1 pair dressy shoes")
+    if has_male:
+        packing.append(f"  👔 {outfits} shirts")
+        packing.append(f"  👖 {outfits} pants/shorts")
+        packing.append(f"  👟 comfortable walking shoes")
+        packing.append(f"  👞 1 pair dressy shoes")
+    
+    packing.append(f"  🧦 {duration} pairs of underwear and socks")
+    packing.append(f"  🧥 1 jacket/sweater")
+    
+    # children extras
+    has_children = False
+    children_items = []
+    for t in travelers:
+        if t["type"] == "child":
+            has_children = True
+            age = int(t["age"])
+            if age < 3:
+                children_items.append("  🍼 Diapers and baby wipes")
+                children_items.append("  🍼 Baby formula/food")
+                children_items.append(f"  👶 {outfits + 2} outfits (extra for accidents)")
+            elif age <= 10:
+                children_items.append("  🍎 Kids snacks")
+                children_items.append("  🧸 Entertainment (toys, tablet)")
+                children_items.append(f"  👕 {outfits + 1} outfits (extra change)")
+            else:
+                children_items.append("  📱 Charger/entertainment")
+                children_items.append(f"  👕 {outfits} outfits")
+    
+    if has_children:
+        packing.append("\n👶 CHILDREN'S ITEMS:")
+        packing.extend(children_items)
+    
+    # special needs
+    special_items = []
+    for t in travelers:
+        if t["special"]:
+            items = t["special"].split(",")
+            for item in items:
+                special_items.append(f"  ⭐ {item.strip()}")
+    
+    if special_items:
+        packing.append("\n⭐ SPECIAL NEEDS ITEMS:")
+        packing.extend(special_items)
+    
+    # essentials
+    packing.append("\n🎒 ESSENTIALS:")
+    packing.append("  🧴 Toiletries (shampoo, toothbrush, etc.)")
+    packing.append("  💊 Medications")
+    packing.append("  📱 Phone + charger")
+    packing.append("  💼 Suitcase/backpack")
+    packing.append("  🗺️ Travel insurance documents")
+    
+    # international extras
+    if is_international:
+        packing.append("\n🌍 INTERNATIONAL TRAVEL:")
+        packing.append("  🛂 Passport")
+        packing.append("  💱 Local currency / notify your bank")
+        packing.append("  🔌 Travel adapter/converter")
+        packing.append("  📋 Copies of important documents")
+    
+    # print packing list
+    print("Your Packing List:")
+    print("-" * 30)
+    for item in packing:
+        print(item)
+    
+    print()
+    print("1. 💾 Save List")
+    print("2. 🆕 New Trip")
+    print("3. 🏠 Home")
+    print()
+    
+    choice = input("Choose from options above: ").strip()
+    
+    if choice == "1":
+        save_list(destination, departure, return_date, packing)
+    elif choice == "2":
+        confirm = input("⚠️ Going back will lose current list. Continue? [Y/N]: ").strip().lower()
+        if confirm == "y":
+            enter_trip_dates()
+        else:
+            packing_list(departure, return_date, duration, destination, travelers, is_international)
+    elif choice == "3":
+        confirm = input("⚠️ Going back will lose current list. Continue? [Y/N]: ").strip().lower()
+        if confirm == "y":
+            home()
+        else:
+            packing_list(departure, return_date, duration, destination, travelers, is_international)
+    else:
+        print("⚠️ Invalid option. Please try again.")
+        packing_list(departure, return_date, duration, destination, travelers, is_international)
 if __name__ == "__main__":
     main()
