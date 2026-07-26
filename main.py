@@ -1,10 +1,12 @@
 import time
+from datetime import datetime
+import zmq
 
 def main():
     home()
 
 def home():
-    #home screen for the trip packing assistant
+    # home screen for the trip packing assistant
     print("🧳 Trip Packer")
     print("------------------------------")
     print("Your trip packing assistant to help you get ready for your trip!")
@@ -14,9 +16,9 @@ def home():
     print("2. Saved Trips")
     print("3. Exit")
     print()
-    
+
     choice = input("Choose Option and [enter]: ").strip()
-    
+
     if choice == "1":
         enter_trip_dates()
     elif choice == "2":
@@ -31,7 +33,7 @@ def get_next_choice():
     # prompts user to continue to the next step, restart current step, or quit
     print()
     choice = input("Next [Y/Enter], Restart [R], Quit [Q]: ").strip().lower()
-    
+
     if choice == "q":
         confirm = input("⚠️ Are you sure you want to quit? All current info will be lost. [Y/N]: ").strip().lower()
         if confirm == "y":
@@ -39,20 +41,46 @@ def get_next_choice():
             exit()
         else:
             return get_next_choice()  # ask again if user changes mind
-    
+
     return choice
+
+def get_location(destination):
+    """ Fetch location information from the map-location-service using ZeroMQ.
+    Args: city, state/country as a string
+    returns: dictionary with location information (timezone, map_url, etc.) or None if error"""
+    
+    # use ZeroMQ to send/receive data to/from the map-location-service
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    # connect to the server where (map-location-service) is running
+    socket.connect("tcp://localhost:3010")
+
+    # Send request in json format
+    socket.send_json({"query": destination})
+
+    # Receive response in json format and convert it to a Python dictionary
+    response = socket.recv_json()
+
+    # Clean up socket connection
+    socket.close()
+    context.term()
+
+    if "error" in response:
+        print(f"⚠️ {response['error']}")
+        return None
+
+    return response
 
 def enter_trip_dates():
     print("\nEnter Trip Dates [Step 1/4]")
     print("------------------------------")
     print("Format: MM/DD/YYYY")
     print()
-    
+
     departure = input("Departure Date: ").strip()
     return_date = input("Return Date: ").strip()
-    
+
     # Calculate trip duration
-    from datetime import datetime
     try:
         dep = datetime.strptime(departure, "%m/%d/%Y")
         ret = datetime.strptime(return_date, "%m/%d/%Y")
@@ -107,11 +135,21 @@ def enter_destination(departure, return_date, duration):
         print("⚠️ Invalid option. Please try again.")
         enter_destination(departure, return_date, duration)
         return
-    
+
     print(f"\nDestination confirmed: {destination}")
-    
+
+    print("🔍 Fetching location details...")
+    loc_data = get_location(destination) # call get_location to fetch location information
+
+    # check coordinates, timezone, map link for debugging purpose
+    if loc_data:
+        print("Location details fetched successfully!")
+        print(f"latitude: {loc_data.get('latitude', 'N/A')}, longitude: {loc_data.get('longitude', 'N/A')}")
+        print(f"Timezone: {loc_data.get('timezone', 'N/A')}")
+        print(f"Map Link: {loc_data.get('map_url', 'N/A')}")
+
     next_choice = get_next_choice()
-    
+
     if next_choice == "r":
         enter_destination(departure, return_date, duration)
     else:
@@ -440,5 +478,8 @@ def view_saved_list(trip):
         saved_trips()
     else:
         home()
+
+
+
 if __name__ == "__main__":
     main()
