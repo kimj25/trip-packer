@@ -1,9 +1,5 @@
-import time
 from datetime import datetime
 import zmq
-
-def main():
-    home()
 
 def home():
     # home screen for the trip packing assistant
@@ -48,7 +44,7 @@ def get_location(destination):
     """ Fetch location information from the map-location-service using ZeroMQ.
     Args: city, state/country as a string
     returns: dictionary with location information (timezone, map_url, etc.) or None if error"""
-    
+
     # use ZeroMQ to send/receive data to/from the map-location-service
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
@@ -85,25 +81,25 @@ def enter_trip_dates():
         dep = datetime.strptime(departure, "%m/%d/%Y")
         ret = datetime.strptime(return_date, "%m/%d/%Y")
         duration = (ret - dep).days
-        
+
         if duration <= 0:
             # if return date is before or same as departure date, prompt user to re-enter
             print("⚠️ Return date must be after departure date. Please try again.")
             enter_trip_dates()
             return
-            
+
         print(f"\nDeparture: {departure}")
         print(f"Return: {return_date}")
         print(f"Trip duration: {duration} days")
-        
+
     except ValueError:
         # if the date format is invalid, prompt user to re-enter
         print("⚠️ Invalid date format. Please use MM/DD/YYYY.")
         enter_trip_dates()
         return
-    
+
     next_choice = get_next_choice()
-    
+
     if next_choice == "r":
         enter_trip_dates()  # restart current step
     else:
@@ -116,9 +112,9 @@ def enter_destination(departure, return_date, duration):
     print("1. Domestic (USA)")
     print("2. International")
     print()
-    
+
     choice = input("Choose 1 or 2: ").strip()
-    
+
     if choice == "1":
         # domestic trip
         city = input("City: ").strip()
@@ -159,36 +155,36 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
     # collect traverler and traveler's group information
     print("\nTraveler Profile Builder [Step 3/4]")
     print("------------------------------")
-    
+
     # get number of travelers
     try:
         num_adults = int(input("Number of Adults: ").strip())
         num_children = int(input("Number of Children: ").strip())
     except ValueError:
         print("⚠️ Please enter a valid number.")
-        traveler_profile(departure, return_date, duration, destination)
+        traveler_profile(departure, return_date, duration, destination, is_international)
         return
-    
+
     travelers = []
-    
+
     # collect adult info
     for i in range(num_adults):
         print(f"\n--- Adult {i+1} ---")
         age = input("Age: ").strip()
         sex = input("Sex (M/F/Other): ").strip()
-        
+
         # dietary information
         dietary = input("Dietary Restriction? (Y/N): ").strip().lower()
         dietary_info = ""
         if dietary == "y":
             dietary_info = input("Please describe: ").strip()
-        
+
         # custom needs
         special = input("Special Needs? (Y/N): ").strip().lower()
         special_info = ""
         if special == "y":
             special_info = input("Please list items with comma in between ex) item1, item2,...: ").strip()
-        
+
         travelers.append({
             "type": "adult",
             "age": age,
@@ -196,18 +192,18 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
             "dietary": dietary_info,
             "special": special_info
         })
-    
+
     # collect children info
     for i in range(num_children):
         print(f"\n--- Child {i+1} ---")
         age = input("Age: ").strip()
         sex = input("Sex (M/F/Other): ").strip()
-        
+
         dietary = input("Dietary Restriction? (Y/N): ").strip().lower()
         dietary_info = ""
         if dietary == "y":
             dietary_info = input("Please describe: ").strip()
-        
+
         special = input("Special Needs? (Y/N): ").strip().lower()
         special_info = ""
         if special == "y":
@@ -217,7 +213,7 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
             special_choice = input("> ").strip()
             special_map = {"1": "Diapers", "2": "Medications", "3": "Other"}
             special_info = special_map.get(special_choice, "None")
-        
+
         travelers.append({
             "type": "child",
             "age": age,
@@ -225,7 +221,7 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
             "dietary": dietary_info,
             "special": special_info
         })
-    
+
     # show summary
     print(f"\nTravelers: {num_adults} Adult(s), {num_children} Child(ren)")
     for i, t in enumerate(travelers):
@@ -235,9 +231,9 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
         if t['special']:
             print(f", Special: {t['special']}", end="")
         print()
-    
+
     next_choice = get_next_choice()
-    
+
     if next_choice == "r":
         traveler_profile(departure, return_date, duration, destination, is_international)
     else:
@@ -249,9 +245,9 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
     print(f"Here is your packing list for your trip to {destination}!")
     print(f"Trip duration: {duration} days")
     print()
-    
+
     packing = []
-    
+
     # determine number of outfits based on duration
     if duration <= 3:
         outfits = duration
@@ -259,27 +255,27 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         outfits = 5
     else:
         outfits = 7
-    
+
     # clothes based on sex
     has_female = any(t["sex"].upper() == "F" for t in travelers)
     has_male = any(t["sex"].upper() == "M" for t in travelers)
-    
+
     packing.append("👗 CLOTHING:")
     if has_female:
         packing.append(f"  👚 {outfits} tops")
         packing.append(f"  👖 {outfits} bottoms (pants/skirts)")
-        packing.append(f"  👗 1 dress")
-        packing.append(f"  👟 comfortable walking shoes")
-        packing.append(f"  👠 1 pair dressy shoes")
+        packing.append("  👗 1 dress")
+        packing.append("  👟 comfortable walking shoes")
+        packing.append("  👠 1 pair dressy shoes")
     if has_male:
         packing.append(f"  👔 {outfits} shirts")
         packing.append(f"  👖 {outfits} pants/shorts")
-        packing.append(f"  👟 comfortable walking shoes")
-        packing.append(f"  👞 1 pair dressy shoes")
-    
+        packing.append("  👟 comfortable walking shoes")
+        packing.append("  👞 1 pair dressy shoes")
+
     packing.append(f"  🧦 {duration} pairs of underwear and socks")
-    packing.append(f"  🧥 1 jacket/sweater")
-    
+    packing.append("  🧥 1 jacket/sweater")
+
     # children extras
     has_children = False
     children_items = []
@@ -298,11 +294,11 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
             else:
                 children_items.append("  📱 Charger/entertainment")
                 children_items.append(f"  👕 {outfits} outfits")
-    
+
     if has_children:
         packing.append("\n👶 CHILDREN'S ITEMS:")
         packing.extend(children_items)
-    
+
     # special needs
     special_items = []
     for t in travelers:
@@ -310,11 +306,11 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
             items = t["special"].split(",")
             for item in items:
                 special_items.append(f"  ⭐ {item.strip()}")
-    
+
     if special_items:
         packing.append("\n⭐ SPECIAL NEEDS ITEMS:")
         packing.extend(special_items)
-    
+
     # essentials
     packing.append("\n🎒 ESSENTIALS:")
     packing.append("  🧴 Toiletries (shampoo, toothbrush, etc.)")
@@ -322,7 +318,7 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
     packing.append("  📱 Phone + charger")
     packing.append("  💼 Suitcase/backpack")
     packing.append("  🗺️ Travel insurance documents")
-    
+
     # international extras
     if is_international:
         packing.append("\n🌍 INTERNATIONAL TRAVEL:")
@@ -330,13 +326,13 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         packing.append("  💱 Local currency / notify your bank")
         packing.append("  🔌 Travel adapter/converter")
         packing.append("  📋 Copies of important documents")
-    
+
     # print packing list
     print("Your Packing List:")
     print("-" * 30)
     for item in packing:
         print(item)
-    
+
     # After displaying the packing list, provide options to save, start a new trip, or go home
     packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
 
@@ -347,9 +343,9 @@ def packing_list_menu(departure, return_date, duration, destination, travelers, 
     print("2. 🆕 New Trip")
     print("3. 🏠 Home")
     print()
-    
+
     choice = input("Choose from options above: ").strip()
-    
+
     if choice == "1":
         save_list(destination, departure, return_date, packing)
     elif choice == "2":
@@ -371,19 +367,19 @@ def packing_list_menu(departure, return_date, duration, destination, travelers, 
 def save_list(destination, departure, return_date, packing):
     # save packing list to a text file
     filename = "saved_trips.txt"
-    
-    with open(filename, "a") as f:
-        f.write(f"===\n")
+
+    with open(filename, "a", encoding="utf-8") as f:
+        f.write("===\n")
         f.write(f"destination={destination}\n")
         f.write(f"departure={departure}\n")
         f.write(f"return={return_date}\n")
         f.write(f"items={'^'.join(packing)}\n")
 
     # inform user that list will be saved locally
-    print("⚠️ Will be saved locally on your device only.") 
+    print("⚠️ Will be saved locally on your device only.")
     print("✅ Saved!")
     print()
-    
+
     input("Press [Enter] to go back to Home: ")
     home()
 
@@ -391,22 +387,22 @@ def saved_trips():
     # display saved trips from the text file
     print("\nSaved Trips:")
     print("------------------------------")
-    
+
     try:
-        with open("saved_trips.txt", "r") as f:
+        with open("saved_trips.txt", "r", encoding="utf-8") as f:
             content = f.read()
-        
+
         # parse saved trips
         trips = content.strip().split("===\n")
         trips = [t for t in trips if t.strip()]  # remove empty
-        
+
         if not trips:
             print("No saved trips yet!")
             print()
             input("Press [Enter] to go back to Home: ")
             home()
             return
-        
+
         # display trips
         for i, trip in enumerate(trips):
             lines = trip.strip().split("\n")
@@ -416,12 +412,12 @@ def saved_trips():
                     key, value = line.split("=", 1)
                     trip_data[key] = value
             print(f"{i+1}. {trip_data.get('destination', 'Unknown')} | {trip_data.get('departure', '')} - {trip_data.get('return', '')}")
-        
+
         print(f"{len(trips)+1}. 🏠 Back to Home")
         print()
-        
+
         choice = input("Choose trip to view: ").strip()
-        
+
         if choice == str(len(trips)+1):
             # go back to home
             home()
@@ -437,7 +433,7 @@ def saved_trips():
             except ValueError:
                 print("⚠️ Invalid option. Please try again.")
                 saved_trips()
-    
+
     except FileNotFoundError:
         # if no trips have been saved yet, inform the user
         print("No saved trips yet!")
@@ -449,31 +445,31 @@ def view_saved_list(trip):
     # view saved packing list of the chosen trip
     print("\nViewing List")
     print("------------------------------")
-    
+
     lines = trip.strip().split("\n")
     trip_data = {}
     for line in lines:
         if "=" in line:
             key, value = line.split("=", 1)
             trip_data[key] = value
-    
+
     print(f"📍 {trip_data.get('destination', 'Unknown')}")
     print(f"📅 {trip_data.get('departure', '')} - {trip_data.get('return', '')}")
     print()
     print("Your Packing List:")
     print("-" * 30)
-    
+
     items = trip_data.get('items', '').split('^')
     for item in items:
         print(item)
-    
+
     print()
     print("1. 📋 View another trip")
     print("2. 🏠 Home")
     print()
-    
+
     choice = input("Choose from the above option: ").strip()
-    
+
     if choice == "1":
         saved_trips()
     else:
@@ -482,4 +478,4 @@ def view_saved_list(trip):
 
 
 if __name__ == "__main__":
-    main()
+    home()
