@@ -1,6 +1,9 @@
 from datetime import datetime
 import zmq
 
+# use ZeroMQ to send/receive data to/from the map-location-service
+context = zmq.Context()
+
 def home():
     # home screen for the trip packing assistant
     print("🧳 Trip Packer")
@@ -45,8 +48,6 @@ def get_location(destination):
     Args: city, state/country as a string
     returns: dictionary with location information (timezone, map_url, etc.) or None if error"""
 
-    # use ZeroMQ to send/receive data to/from the map-location-service
-    context = zmq.Context()
     socket = context.socket(zmq.REQ)
     # connect to the server where (map-location-service) is running
     socket.connect("tcp://localhost:3010")
