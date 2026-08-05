@@ -54,3 +54,10 @@ return=09/15/2026
 items=👗 CLOTHING:^  👚 5 tops^  👖 5 bottoms (pants/skirts)^  👗 1 dress^  👟 comfortable walking shoes^  👠 1 pair dressy shoes^  🧦 6 pairs of underwear and socks^  🧥 1 jacket/sweater^
 🎒 ESSENTIALS:^  🧴 Toiletries (shampoo, toothbrush, etc.)^  💊 Medications^  📱 Phone + charger^  💼 Suitcase/backpack^  🗺️ Travel insurance documents^
 🌍 INTERNATIONAL TRAVEL:^  🛂 Passport^  💱 Local currency / notify your bank^  🔌 Travel adapter/converter^  📋 Copies of important documents
+===
+destination=Boston, MA
+departure=09/09/2026
+return=09/11/2026
+items=
+🌤️ WEATHER FORECAST:^  🌡️ Average: 12°C - 21°C / 54°F - 70°F^  ☔ Rain: 0 day(s)^  ❄️ Snow: 0 day(s)^👗 CLOTHING:^  👔 2 shirts^  👖 2 pairs of pants^  👟 comfortable walking shoes^  👞 1 pair dressy shoes^  🧦 2 pairs of underwear and socks^  🩳 1 pair of shorts^  🕶️ 1 pair of sunglasses^  👕 1 light/breathable top^  🧥 1 light jacket/sweater^
+🎒 ESSENTIALS:^  🧴 Toiletries (shampoo, toothbrush, etc.)^  💊 Medications^  📱 Phone + charger^  💼 Suitcase/backpack^  🗺️ Travel insurance documents

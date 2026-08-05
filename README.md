@@ -10,11 +10,13 @@ CS 361 Project — A CLI-based trip packing assistant that generates personalize
 - International travel extras (passport, adapters, currency)
 - Save and retrieve past trip packing lists
 - Fetches destination info (coordinates, timezone, map link) via ZeroMQ location-map microservice
+- Generates the adult clothing list via ZeroMQ clothing-recommender microservice (temperature- and weather-aware)
 
 ## Prerequisites
 
 - Python 3.6+
 - [location-map-microservice](https://github.com/your-repo/location-map-microservice) running on `tcp://localhost:3010`
+- [clothing-recommender-microservice](https://github.com/your-repo/clothing-recommender) running on `tcp://localhost:3016`
 
 ## Installation
 
@@ -25,11 +27,12 @@ pip install -r requirements.txt
 ## Usage
 
 1. Start the **location-map-microservice** first (must be listening on port 3010)
-2. Run the app:
+2. Start the **clothing-recommender-microservice** (must be listening on port 3016)
+3. Run the app:
    ```bash
    python main.py
    ```
-3. Follow the on-screen prompts:
+4. Follow the on-screen prompts:
    - **Step 1:** Enter departure and return dates
    - **Step 2:** Enter destination (domestic or international)
    - **Step 3:** Build traveler profiles
@@ -43,6 +46,8 @@ Trip-packer connects to `location-map-microservice` using ZeroMQ REQ/REP pattern
 - **Response:** `{"latitude": ..., "longitude": ..., "timezone": ..., "map_url": ...}`
 
 If the service is unavailable, the app prints a warning and continues without location data.
+
+Trip-packer also connects to `clothing-recommender-microservice` using ZeroMQ REQ/REP pattern on `tcp://localhost:3016`. It sends the summarized weather (avg high/low in °C, rainy/snowy day counts, and per-day highs/lows) plus trip duration and traveler profiles, and receives the adult clothing list. If the service is unavailable, the app falls back to its built-in clothing logic.
 
 ## Project Structure
 

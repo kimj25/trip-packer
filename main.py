@@ -1,10 +1,7 @@
 from datetime import datetime
 import zmq
 
-# use ZeroMQ to send/receive data to/from microservices
-
 def home():
-    # home screen for the trip packing assistant
     print("🧳 Trip Packer")
     print("------------------------------")
     print("Your trip packing assistant to help you get ready for your trip!")
@@ -28,7 +25,6 @@ def home():
         home()
 
 def get_next_choice():
-    # prompts user to continue to the next step, restart current step, or quit
     print()
     choice = input("Next [Y/Enter], Restart [R], Quit [Q]: ").strip().lower()
 
@@ -38,29 +34,27 @@ def get_next_choice():
             print("Goodbye! Safe travels! 🧳")
             exit()
         else:
-            return get_next_choice()  # ask again if user changes mind
+            return get_next_choice()
 
     return choice
 
 def get_location(destination):
-    """ Fetch location information from the map-location-service using ZeroMQ.
-    Args: city, state/country as a string
-    returns: dictionary with location information (timezone, map_url, etc.) or None if error"""
-
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    # connect to the server where (map-location-service) is running
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.setsockopt(zmq.RCVTIMEO, 60000)
     socket.connect("tcp://localhost:3010")
 
-    # Send request in json format
     socket.send_json({"query": destination})
 
-    # Receive response in json format and convert it to a Python dictionary
-    response = socket.recv_json()
-
-    # Clean up socket connection
-    socket.close()
-    context.term()
+    try:
+        response = socket.recv_json()
+    except zmq.Again:
+        print("⚠️ Map-location service timed out. Continuing without location data.")
+        return None
+    finally:
+        socket.close()
+        context.term()
 
     if "error" in response:
         print(f"⚠️ {response['error']}")
@@ -69,20 +63,15 @@ def get_location(destination):
     return response
 
 def get_weather(latitude, longitude, departure, return_date):
-    """Fetch weather forecast from the weather-service using ZeroMQ.
-    Args: latitude, longitude, and departure/return dates in "MM/DD/YYYY" format
-    returns: dictionary with daily weather breakdown or None if error"""
-
-    # weather-service expects dates in YYYY-MM-DD format
     dep = datetime.strptime(departure, "%m/%d/%Y").strftime("%Y-%m-%d")
     ret = datetime.strptime(return_date, "%m/%d/%Y").strftime("%Y-%m-%d")
 
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    # connect to the server where (weather-service) is running
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.setsockopt(zmq.RCVTIMEO, 60000)
     socket.connect("tcp://localhost:3015")
 
-    # Send request in json format
     socket.send_json({
         "latitude": latitude,
         "longitude": longitude,
@@ -90,12 +79,14 @@ def get_weather(latitude, longitude, departure, return_date):
         "end_date": ret
     })
 
-    # Receive response in json format and convert it to a Python dictionary
-    response = socket.recv_json()
-
-    # Clean up socket connection
-    socket.close()
-    context.term()
+    try:
+        response = socket.recv_json()
+    except zmq.Again:
+        print("⚠️ Weather service timed out. Continuing without weather data.")
+        return None
+    finally:
+        socket.close()
+        context.term()
 
     if "error" in response:
         print(f"⚠️ {response['error']}")
@@ -104,17 +95,22 @@ def get_weather(latitude, longitude, departure, return_date):
     return response
 
 def convert_temperature(celsius):
-    """Convert Celsius to Fahrenheit using the unit-converter-service (port 3011)."""
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.setsockopt(zmq.RCVTIMEO, 10000)
     socket.connect("tcp://localhost:3011")
 
     socket.send_json({"conversion": "c_to_f", "value": celsius})
 
-    response = socket.recv_json()
-
-    socket.close()
-    context.term()
+    try:
+        response = socket.recv_json()
+    except zmq.Again:
+        print("⚠️ Unit-converter service timed out. Skipping Fahrenheit conversion.")
+        return None
+    finally:
+        socket.close()
+        context.term()
 
     if response.get("status") != "success":
         print(f"⚠️ {response.get('message', 'Unit conversion failed.')}")
@@ -123,7 +119,6 @@ def convert_temperature(celsius):
     return response["result"]
 
 def build_weather_section(weather):
-    """Summarize the weather-service response into packing list lines."""
     if not weather:
         return []
 
@@ -134,7 +129,6 @@ def build_weather_section(weather):
     highs = [d["high"] for d in daily if d["high"] != "N/A"]
     lows = [d["low"] for d in daily if d["low"] != "N/A"]
 
-    # count days with rain/snow based on human readable conditions
     rainy = sum(1 for d in daily if any(k in d["conditions"] for k in ("Rain", "Drizzle", "Thunder")))
     snowy = sum(1 for d in daily if "Snow" in d["conditions"])
 
@@ -153,6 +147,56 @@ def build_weather_section(weather):
     section.append(f"  ❄️ Snow: {snowy} day(s)")
     return section
 
+def get_clothing(weather, duration, travelers):
+    daily = weather.get("daily", []) if weather else []
+
+    highs = [d["high"] for d in daily if d["high"] != "N/A"]
+    lows = [d["low"] for d in daily if d["low"] != "N/A"]
+    rainy = sum(1 for d in daily if any(k in d["conditions"] for k in ("Rain", "Drizzle", "Thunder")))
+    snowy = sum(1 for d in daily if "Snow" in d["conditions"])
+
+    avg_high = round(sum(highs) / len(highs)) if highs else None
+    avg_low = round(sum(lows) / len(lows)) if lows else None
+
+    if avg_high is None or avg_low is None:
+        return None
+
+    weather_summary = {
+        "avg_high_c": avg_high,
+        "avg_low_c": avg_low,
+        "rainy_days": rainy,
+        "snowy_days": snowy,
+        "daily": [{"date": d["date"], "high": d["high"], "low": d["low"]} for d in daily if d["high"] != "N/A"]
+    }
+    travelers_summary = [{"type": t["type"], "age": t["age"], "sex": t["sex"]} for t in travelers]
+
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.setsockopt(zmq.RCVTIMEO, 60000)
+    socket.connect("tcp://localhost:3016")
+
+    socket.send_json({
+        "weather": weather_summary,
+        "trip": {"duration_days": duration},
+        "travelers": travelers_summary,
+    })
+
+    try:
+        response = socket.recv_json()
+    except zmq.Again:
+        print("⚠️ Clothing-recommender service timed out. Using local clothing logic.")
+        return None
+    finally:
+        socket.close()
+        context.term()
+
+    if "error" in response:
+        print(f"⚠️ {response['error']}")
+        return None
+
+    return response["clothing"]
+
 def enter_trip_dates():
     print("\nEnter Trip Dates [Step 1/4]")
     print("------------------------------")
@@ -162,14 +206,12 @@ def enter_trip_dates():
     departure = input("Departure Date: ").strip()
     return_date = input("Return Date: ").strip()
 
-    # Calculate trip duration
     try:
         dep = datetime.strptime(departure, "%m/%d/%Y")
         ret = datetime.strptime(return_date, "%m/%d/%Y")
         duration = (ret - dep).days
 
         if duration <= 0:
-            # if return date is before or same as departure date, prompt user to re-enter
             print("⚠️ Return date must be after departure date. Please try again.")
             enter_trip_dates()
             return
@@ -179,7 +221,6 @@ def enter_trip_dates():
         print(f"Trip duration: {duration} days")
 
     except ValueError:
-        # if the date format is invalid, prompt user to re-enter
         print("⚠️ Invalid date format. Please use MM/DD/YYYY.")
         enter_trip_dates()
         return
@@ -187,9 +228,9 @@ def enter_trip_dates():
     next_choice = get_next_choice()
 
     if next_choice == "r":
-        enter_trip_dates()  # restart current step
+        enter_trip_dates()
     else:
-        enter_destination(departure, return_date, duration)  # proceed
+        enter_destination(departure, return_date, duration)
 
 def enter_destination(departure, return_date, duration):
     print("\nEnter Destination [Step 2/4]")
@@ -202,13 +243,11 @@ def enter_destination(departure, return_date, duration):
     choice = input("Choose 1 or 2: ").strip()
 
     if choice == "1":
-        # domestic trip
         city = input("City: ").strip()
         state = input("State: ").strip()
         destination = f"{city}, {state}"
         is_international = False
     elif choice == "2":
-        # international trip
         city = input("City: ").strip()
         country = input("Country: ").strip()
         destination = f"{city}, {country}"
@@ -221,9 +260,8 @@ def enter_destination(departure, return_date, duration):
     print(f"\nDestination confirmed: {destination}")
 
     print("🔍 Fetching location details...")
-    loc_data = get_location(destination) # call get_location to fetch location information
+    loc_data = get_location(destination)
 
-    # check coordinates, timezone, map link for debugging purpose
     if loc_data:
         print("Location details fetched successfully!")
         print(f"latitude: {loc_data.get('latitude', 'N/A')}, longitude: {loc_data.get('longitude', 'N/A')}")
@@ -238,11 +276,9 @@ def enter_destination(departure, return_date, duration):
         traveler_profile(departure, return_date, duration, destination, is_international, loc_data)
 
 def traveler_profile(departure, return_date, duration, destination, is_international, loc_data):
-    # collect traverler and traveler's group information
     print("\nTraveler Profile Builder [Step 3/4]")
     print("------------------------------")
 
-    # get number of travelers
     try:
         num_adults = int(input("Number of Adults: ").strip())
         num_children = int(input("Number of Children: ").strip())
@@ -253,19 +289,16 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
 
     travelers = []
 
-    # collect adult info
     for i in range(num_adults):
         print(f"\n--- Adult {i+1} ---")
         age = input("Age: ").strip()
         sex = input("Sex (M/F/Other): ").strip()
 
-        # dietary information
         dietary = input("Dietary Restriction? (Y/N): ").strip().lower()
         dietary_info = ""
         if dietary == "y":
             dietary_info = input("Please describe: ").strip()
 
-        # custom needs
         special = input("Special Needs? (Y/N): ").strip().lower()
         special_info = ""
         if special == "y":
@@ -279,7 +312,6 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
             "special": special_info
         })
 
-    # collect children info
     for i in range(num_children):
         print(f"\n--- Child {i+1} ---")
         age = input("Age: ").strip()
@@ -308,7 +340,6 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
             "special": special_info
         })
 
-    # show summary
     print(f"\nTravelers: {num_adults} Adult(s), {num_children} Child(ren)")
     for i, t in enumerate(travelers):
         print(f"{t['type'].capitalize()} {i+1}: Age {t['age']}, {t['sex']}", end="")
@@ -332,7 +363,6 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
     print(f"Trip duration: {duration} days")
     print()
 
-    # fetch weather forecast if location data is available
     weather = None
     if loc_data and loc_data.get("latitude") is not None and loc_data.get("longitude") is not None:
         print("🌤️ Fetching weather forecast...")
@@ -340,35 +370,36 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
 
     packing = build_weather_section(weather)
 
-    # determine number of outfits based on duration
-    if duration <= 3:
-        outfits = duration
-    elif duration <= 7:
-        outfits = 5
-    else:
-        outfits = 7
-
-    # clothes based on sex
-    has_female = any(t["sex"].upper() == "F" for t in travelers)
-    has_male = any(t["sex"].upper() == "M" for t in travelers)
+    clothing = get_clothing(weather, duration, travelers)
 
     packing.append("👗 CLOTHING:")
-    if has_female:
-        packing.append(f"  👚 {outfits} tops")
-        packing.append(f"  👖 {outfits} bottoms (pants/skirts)")
-        packing.append("  👗 1 dress")
-        packing.append("  👟 comfortable walking shoes")
-        packing.append("  👠 1 pair dressy shoes")
-    if has_male:
-        packing.append(f"  👔 {outfits} shirts")
-        packing.append(f"  👖 {outfits} pants/shorts")
-        packing.append("  👟 comfortable walking shoes")
-        packing.append("  👞 1 pair dressy shoes")
+    if clothing:
+        packing.extend(f"  {item}" for item in clothing)
+    else:
+        if duration <= 3:
+            outfits = duration
+        elif duration <= 7:
+            outfits = 5
+        else:
+            outfits = 7
 
-    packing.append(f"  🧦 {duration} pairs of underwear and socks")
-    packing.append("  🧥 1 jacket/sweater")
+        has_female = any(t["sex"].upper() == "F" for t in travelers)
+        has_male = any(t["sex"].upper() == "M" for t in travelers)
 
-    # children extras
+        if has_female:
+            packing.append(f"  👚 {outfits} tops")
+            packing.append(f"  👖 {outfits} bottoms (pants/skirts)")
+            packing.append("  👗 1 dress")
+            packing.append("  👟 comfortable walking shoes")
+            packing.append("  👠 1 pair dressy shoes")
+        if has_male:
+            packing.append(f"  👔 {outfits} shirts")
+            packing.append(f"  👖 {outfits} pants/shorts")
+            packing.append("  👟 comfortable walking shoes")
+            packing.append("  👞 1 pair dressy shoes")
+        packing.append(f"  🧦 {duration} pairs of underwear and socks")
+        packing.append("  🧥 1 jacket/sweater")
+
     has_children = False
     children_items = []
     for t in travelers:
@@ -391,7 +422,6 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         packing.append("\n👶 CHILDREN'S ITEMS:")
         packing.extend(children_items)
 
-    # special needs
     special_items = []
     for t in travelers:
         if t["special"]:
@@ -403,7 +433,6 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         packing.append("\n⭐ SPECIAL NEEDS ITEMS:")
         packing.extend(special_items)
 
-    # essentials
     packing.append("\n🎒 ESSENTIALS:")
     packing.append("  🧴 Toiletries (shampoo, toothbrush, etc.)")
     packing.append("  💊 Medications")
@@ -411,7 +440,6 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
     packing.append("  💼 Suitcase/backpack")
     packing.append("  🗺️ Travel insurance documents")
 
-    # international extras
     if is_international:
         packing.append("\n🌍 INTERNATIONAL TRAVEL:")
         packing.append("  🛂 Passport")
@@ -419,17 +447,14 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         packing.append("  🔌 Travel adapter/converter")
         packing.append("  📋 Copies of important documents")
 
-    # print packing list
     print("Your Packing List:")
     print("-" * 30)
     for item in packing:
         print(item)
 
-    # After displaying the packing list, provide options to save, start a new trip, or go home
     packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
 
 def packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing):
-    # helper function to display save/new trip/exit options after packing list is generated
     print()
     print("1. 💾 Save List")
     print("2. 🆕 New Trip")
@@ -457,7 +482,6 @@ def packing_list_menu(departure, return_date, duration, destination, travelers, 
         packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
 
 def save_list(destination, departure, return_date, packing):
-    # save packing list to a text file
     filename = "saved_trips.txt"
 
     with open(filename, "a", encoding="utf-8") as f:
@@ -467,7 +491,6 @@ def save_list(destination, departure, return_date, packing):
         f.write(f"return={return_date}\n")
         f.write(f"items={'^'.join(packing)}\n")
 
-    # inform user that list will be saved locally
     print("⚠️ Will be saved locally on your device only.")
     print("✅ Saved!")
     print()
@@ -476,7 +499,6 @@ def save_list(destination, departure, return_date, packing):
     home()
 
 def saved_trips():
-    # display saved trips from the text file
     print("\nSaved Trips:")
     print("------------------------------")
 
@@ -484,9 +506,8 @@ def saved_trips():
         with open("saved_trips.txt", "r", encoding="utf-8") as f:
             content = f.read()
 
-        # parse saved trips
         trips = content.strip().split("===\n")
-        trips = [t for t in trips if t.strip()]  # remove empty
+        trips = [t for t in trips if t.strip()]
 
         if not trips:
             print("No saved trips yet!")
@@ -495,7 +516,6 @@ def saved_trips():
             home()
             return
 
-        # display trips
         for i, trip in enumerate(trips):
             lines = trip.strip().split("\n")
             trip_data = {}
@@ -511,10 +531,8 @@ def saved_trips():
         choice = input("Choose trip to view: ").strip()
 
         if choice == str(len(trips)+1):
-            # go back to home
             home()
         else:
-            # view selected trip
             try:
                 idx = int(choice) - 1
                 if 0 <= idx < len(trips):
@@ -527,14 +545,12 @@ def saved_trips():
                 saved_trips()
 
     except FileNotFoundError:
-        # if no trips have been saved yet, inform the user
         print("No saved trips yet!")
         print()
         input("Press [Enter] to go back to Home: ")
         home()
 
 def view_saved_list(trip):
-    # view saved packing list of the chosen trip
     print("\nViewing List")
     print("------------------------------")
 
@@ -566,8 +582,6 @@ def view_saved_list(trip):
         saved_trips()
     else:
         home()
-
-
 
 if __name__ == "__main__":
     home()
