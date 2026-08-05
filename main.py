@@ -1,8 +1,7 @@
 from datetime import datetime
 import zmq
 
-# use ZeroMQ to send/receive data to/from the map-location-service
-context = zmq.Context()
+# use ZeroMQ to send/receive data to/from microservices
 
 def home():
     # home screen for the trip packing assistant
@@ -48,6 +47,7 @@ def get_location(destination):
     Args: city, state/country as a string
     returns: dictionary with location information (timezone, map_url, etc.) or None if error"""
 
+    context = zmq.Context()
     socket = context.socket(zmq.REQ)
     # connect to the server where (map-location-service) is running
     socket.connect("tcp://localhost:3010")
@@ -67,6 +67,91 @@ def get_location(destination):
         return None
 
     return response
+
+def get_weather(latitude, longitude, departure, return_date):
+    """Fetch weather forecast from the weather-service using ZeroMQ.
+    Args: latitude, longitude, and departure/return dates in "MM/DD/YYYY" format
+    returns: dictionary with daily weather breakdown or None if error"""
+
+    # weather-service expects dates in YYYY-MM-DD format
+    dep = datetime.strptime(departure, "%m/%d/%Y").strftime("%Y-%m-%d")
+    ret = datetime.strptime(return_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    # connect to the server where (weather-service) is running
+    socket.connect("tcp://localhost:3015")
+
+    # Send request in json format
+    socket.send_json({
+        "latitude": latitude,
+        "longitude": longitude,
+        "start_date": dep,
+        "end_date": ret
+    })
+
+    # Receive response in json format and convert it to a Python dictionary
+    response = socket.recv_json()
+
+    # Clean up socket connection
+    socket.close()
+    context.term()
+
+    if "error" in response:
+        print(f"⚠️ {response['error']}")
+        return None
+
+    return response
+
+def convert_temperature(celsius):
+    """Convert Celsius to Fahrenheit using the unit-converter-service (port 3011)."""
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://localhost:3011")
+
+    socket.send_json({"conversion": "c_to_f", "value": celsius})
+
+    response = socket.recv_json()
+
+    socket.close()
+    context.term()
+
+    if response.get("status") != "success":
+        print(f"⚠️ {response.get('message', 'Unit conversion failed.')}")
+        return None
+
+    return response["result"]
+
+def build_weather_section(weather):
+    """Summarize the weather-service response into packing list lines."""
+    if not weather:
+        return []
+
+    daily = weather.get("daily", [])
+    if not daily:
+        return []
+
+    highs = [d["high"] for d in daily if d["high"] != "N/A"]
+    lows = [d["low"] for d in daily if d["low"] != "N/A"]
+
+    # count days with rain/snow based on human readable conditions
+    rainy = sum(1 for d in daily if any(k in d["conditions"] for k in ("Rain", "Drizzle", "Thunder")))
+    snowy = sum(1 for d in daily if "Snow" in d["conditions"])
+
+    avg_high = round(sum(highs) / len(highs)) if highs else "N/A"
+    avg_low = round(sum(lows) / len(lows)) if lows else "N/A"
+
+    section = ["\n🌤️ WEATHER FORECAST:"]
+    if avg_high != "N/A" and avg_low != "N/A":
+        line = f"  🌡️ Average: {avg_low}°C - {avg_high}°C"
+        f_low = convert_temperature(avg_low)
+        f_high = convert_temperature(avg_high)
+        if f_low is not None and f_high is not None:
+            line += f" / {round(f_low)}°F - {round(f_high)}°F"
+        section.append(line)
+    section.append(f"  ☔ Rain: {rainy} day(s)")
+    section.append(f"  ❄️ Snow: {snowy} day(s)")
+    return section
 
 def enter_trip_dates():
     print("\nEnter Trip Dates [Step 1/4]")
@@ -150,9 +235,9 @@ def enter_destination(departure, return_date, duration):
     if next_choice == "r":
         enter_destination(departure, return_date, duration)
     else:
-        traveler_profile(departure, return_date, duration, destination, is_international)
+        traveler_profile(departure, return_date, duration, destination, is_international, loc_data)
 
-def traveler_profile(departure, return_date, duration, destination, is_international):
+def traveler_profile(departure, return_date, duration, destination, is_international, loc_data):
     # collect traverler and traveler's group information
     print("\nTraveler Profile Builder [Step 3/4]")
     print("------------------------------")
@@ -163,7 +248,7 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
         num_children = int(input("Number of Children: ").strip())
     except ValueError:
         print("⚠️ Please enter a valid number.")
-        traveler_profile(departure, return_date, duration, destination, is_international)
+        traveler_profile(departure, return_date, duration, destination, is_international, loc_data)
         return
 
     travelers = []
@@ -236,18 +321,24 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
     next_choice = get_next_choice()
 
     if next_choice == "r":
-        traveler_profile(departure, return_date, duration, destination, is_international)
+        traveler_profile(departure, return_date, duration, destination, is_international, loc_data)
     else:
-        packing_list(departure, return_date, duration, destination, travelers, is_international)
+        packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data)
 
-def packing_list(departure, return_date, duration, destination, travelers, is_international):
+def packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data):
     print("\nPacking List Result [Step 4/4]")
     print("------------------------------")
     print(f"Here is your packing list for your trip to {destination}!")
     print(f"Trip duration: {duration} days")
     print()
 
-    packing = []
+    # fetch weather forecast if location data is available
+    weather = None
+    if loc_data and loc_data.get("latitude") is not None and loc_data.get("longitude") is not None:
+        print("🌤️ Fetching weather forecast...")
+        weather = get_weather(loc_data["latitude"], loc_data["longitude"], departure, return_date)
+
+    packing = build_weather_section(weather)
 
     # determine number of outfits based on duration
     if duration <= 3:
@@ -335,9 +426,9 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         print(item)
 
     # After displaying the packing list, provide options to save, start a new trip, or go home
-    packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
+    packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
 
-def packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing):
+def packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing):
     # helper function to display save/new trip/exit options after packing list is generated
     print()
     print("1. 💾 Save List")
@@ -354,16 +445,16 @@ def packing_list_menu(departure, return_date, duration, destination, travelers, 
         if confirm == "y":
             enter_trip_dates()
         else:
-            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
+            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
     elif choice == "3":
         confirm = input("⚠️ Going back will lose current list. Continue? [Y/N]: ").strip().lower()
         if confirm == "y":
             home()
         else:
-            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
+            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
     else:
         print("⚠️ Invalid option. Please try again.")
-        packing_list_menu(departure, return_date, duration, destination, travelers, is_international, packing)
+        packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
 
 def save_list(destination, departure, return_date, packing):
     # save packing list to a text file
