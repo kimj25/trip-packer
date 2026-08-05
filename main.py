@@ -469,7 +469,6 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
     packing.append("  💊 Medications")
     packing.append("  📱 Phone + charger")
     packing.append("  💼 Suitcase/backpack")
-    packing.append("  🗺️ Travel insurance documents")
 
     if is_international:
         packing.append("\n🌍 INTERNATIONAL TRAVEL:")
@@ -477,6 +476,7 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         packing.append("  💱 Local currency / notify your bank")
         packing.append("  🔌 Travel adapter/converter")
         packing.append("  📋 Copies of important documents")
+        packing.append("  🗺️ Travel insurance documents")
 
     print("Your Packing List:")
     print("-" * 30)
