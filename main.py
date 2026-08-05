@@ -372,17 +372,17 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
 
     clothing = get_clothing(weather, duration, travelers)
 
+    if duration <= 3:
+        outfits = duration
+    elif duration <= 7:
+        outfits = 5
+    else:
+        outfits = 7
+
     packing.append("👗 CLOTHING:")
     if clothing:
         packing.extend(f"  {item}" for item in clothing)
     else:
-        if duration <= 3:
-            outfits = duration
-        elif duration <= 7:
-            outfits = 5
-        else:
-            outfits = 7
-
         has_female = any(t["sex"].upper() == "F" for t in travelers)
         has_male = any(t["sex"].upper() == "M" for t in travelers)
 
