@@ -38,6 +38,38 @@ def get_next_choice():
 
     return choice
 
+def get_laundry():
+    print("Laundry access during trip?")
+    print("1. None")
+    print("2. Mid-trip")
+    print("3. Daily")
+    choice = input("Choose 1, 2, or 3: ").strip()
+    laundry_map = {"1": "none", "2": "mid-trip", "3": "daily"}
+    if choice not in laundry_map:
+        print("⚠️ Invalid option. Please try again.")
+        return get_laundry()
+    return laundry_map[choice]
+
+def outfit_counts(duration, laundry):
+    if laundry == "daily":
+        tops = min(3, duration)
+        bottoms = min(2, duration)
+        underwear = min(3, duration)
+    elif laundry == "mid-trip":
+        tops = max(3, min(7, (duration + 1) // 2))
+        bottoms = max(2, min(7, round(duration / 5)))
+        underwear = max(3, (duration + 1) // 2)
+    else:
+        if duration <= 3:
+            tops = duration
+        elif duration <= 7:
+            tops = 5
+        else:
+            tops = 7
+        bottoms = min(tops, max(2, round(duration / 3)))
+        underwear = duration
+    return tops, bottoms, underwear
+
 def get_location(destination):
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
@@ -147,7 +179,7 @@ def build_weather_section(weather):
     section.append(f"  ❄️ Snow: {snowy} day(s)")
     return section
 
-def get_clothing(weather, duration, travelers):
+def get_clothing(weather, duration, travelers, laundry="none"):
     daily = weather.get("daily", []) if weather else []
 
     highs = [d["high"] for d in daily if d["high"] != "N/A"]
@@ -178,7 +210,7 @@ def get_clothing(weather, duration, travelers):
 
     socket.send_json({
         "weather": weather_summary,
-        "trip": {"duration_days": duration},
+        "trip": {"duration_days": duration, "laundry": laundry},
         "travelers": travelers_summary,
     })
 
@@ -225,14 +257,17 @@ def enter_trip_dates():
         enter_trip_dates()
         return
 
+    laundry = get_laundry()
+    print(f"Laundry access: {laundry}")
+
     next_choice = get_next_choice()
 
     if next_choice == "r":
         enter_trip_dates()
     else:
-        enter_destination(departure, return_date, duration)
+        enter_destination(departure, return_date, duration, laundry)
 
-def enter_destination(departure, return_date, duration):
+def enter_destination(departure, return_date, duration, laundry):
     print("\nEnter Destination [Step 2/4]")
     print("------------------------------")
     print("Trip is...")
@@ -254,7 +289,7 @@ def enter_destination(departure, return_date, duration):
         is_international = True
     else:
         print("⚠️ Invalid option. Please try again.")
-        enter_destination(departure, return_date, duration)
+        enter_destination(departure, return_date, duration, laundry)
         return
 
     print(f"\nDestination confirmed: {destination}")
@@ -271,11 +306,11 @@ def enter_destination(departure, return_date, duration):
     next_choice = get_next_choice()
 
     if next_choice == "r":
-        enter_destination(departure, return_date, duration)
+        enter_destination(departure, return_date, duration, laundry)
     else:
-        traveler_profile(departure, return_date, duration, destination, is_international, loc_data)
+        traveler_profile(departure, return_date, duration, destination, is_international, loc_data, laundry)
 
-def traveler_profile(departure, return_date, duration, destination, is_international, loc_data):
+def traveler_profile(departure, return_date, duration, destination, is_international, loc_data, laundry):
     print("\nTraveler Profile Builder [Step 3/4]")
     print("------------------------------")
 
@@ -284,7 +319,7 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
         num_children = int(input("Number of Children: ").strip())
     except ValueError:
         print("⚠️ Please enter a valid number.")
-        traveler_profile(departure, return_date, duration, destination, is_international, loc_data)
+        traveler_profile(departure, return_date, duration, destination, is_international, loc_data, laundry)
         return
 
     travelers = []
@@ -352,11 +387,11 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
     next_choice = get_next_choice()
 
     if next_choice == "r":
-        traveler_profile(departure, return_date, duration, destination, is_international, loc_data)
+        traveler_profile(departure, return_date, duration, destination, is_international, loc_data, laundry)
     else:
-        packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data)
+        packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry)
 
-def packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data):
+def packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry):
     print("\nPacking List Result [Step 4/4]")
     print("------------------------------")
     print(f"Here is your packing list for your trip to {destination}!")
@@ -370,14 +405,10 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
 
     packing = build_weather_section(weather)
 
-    clothing = get_clothing(weather, duration, travelers)
+    clothing = get_clothing(weather, duration, travelers, laundry)
 
-    if duration <= 3:
-        outfits = duration
-    elif duration <= 7:
-        outfits = 5
-    else:
-        outfits = 7
+    tops, bottoms, underwear = outfit_counts(duration, laundry)
+    outfits = tops
 
     packing.append("👗 CLOTHING:")
     if clothing:
@@ -387,17 +418,17 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         has_male = any(t["sex"].upper() == "M" for t in travelers)
 
         if has_female:
-            packing.append(f"  👚 {outfits} tops")
-            packing.append(f"  👖 {outfits} bottoms (pants/skirts)")
+            packing.append(f"  👚 {tops} tops")
+            packing.append(f"  👖 {bottoms} bottoms (pants/skirts)")
             packing.append("  👗 1 dress")
             packing.append("  👟 comfortable walking shoes")
             packing.append("  👠 1 pair dressy shoes")
         if has_male:
-            packing.append(f"  👔 {outfits} shirts")
-            packing.append(f"  👖 {outfits} pants/shorts")
+            packing.append(f"  👔 {tops} shirts")
+            packing.append(f"  👖 {bottoms} pants/shorts")
             packing.append("  👟 comfortable walking shoes")
             packing.append("  👞 1 pair dressy shoes")
-        packing.append(f"  🧦 {duration} pairs of underwear and socks")
+        packing.append(f"  🧦 {underwear} pairs of underwear and socks")
         packing.append("  🧥 1 jacket/sweater")
 
     has_children = False
@@ -452,9 +483,9 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
     for item in packing:
         print(item)
 
-    packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
+    packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry, packing)
 
-def packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing):
+def packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry, packing):
     print()
     print("1. 💾 Save List")
     print("2. 🆕 New Trip")
@@ -470,16 +501,16 @@ def packing_list_menu(departure, return_date, duration, destination, travelers, 
         if confirm == "y":
             enter_trip_dates()
         else:
-            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
+            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry, packing)
     elif choice == "3":
         confirm = input("⚠️ Going back will lose current list. Continue? [Y/N]: ").strip().lower()
         if confirm == "y":
             home()
         else:
-            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
+            packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry, packing)
     else:
         print("⚠️ Invalid option. Please try again.")
-        packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, packing)
+        packing_list_menu(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry, packing)
 
 def save_list(destination, departure, return_date, packing):
     filename = "saved_trips.txt"
