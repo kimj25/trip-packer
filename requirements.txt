@@ -1,1 +1,2 @@
 pyzmq>=25.0.0
+streamlit>=1.37.0

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 import zmq
 
 def home():
@@ -243,6 +243,11 @@ def enter_trip_dates():
         ret = datetime.strptime(return_date, "%m/%d/%Y")
         duration = (ret - dep).days
 
+        if dep.date() < date.today():
+            print("⚠️ Departure date cannot be in the past. Please try again.")
+            enter_trip_dates()
+            return
+
         if duration <= 0:
             print("⚠️ Return date must be after departure date. Please try again.")
             enter_trip_dates()
@@ -358,14 +363,42 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
             dietary_info = input("Please describe: ").strip()
 
         special = input("Special Needs? (Y/N): ").strip().lower()
-        special_info = ""
+        special_items = []
         if special == "y":
-            print("1. Diapers")
-            print("2. Medications")
-            print("3. Other")
-            special_choice = input("> ").strip()
-            special_map = {"1": "Diapers", "2": "Medications", "3": "Other"}
-            special_info = special_map.get(special_choice, "None")
+            print("Select items (choose one at a time):")
+            special_map = {
+                "1": "Diapers",
+                "2": "Medications",
+                "3": "Baby formula",
+                "4": "Car seat",
+                "5": "Other",
+            }
+            while True:
+                print()
+                for key, label in special_map.items():
+                    print(f"{key}. {label}")
+                print("0. Done")
+                choice = input("> ").strip()
+                if choice == "0":
+                    break
+                elif choice == "5":
+                    custom = input("Describe the item: ").strip()
+                    if custom:
+                        special_items.append(custom)
+                    else:
+                        print("⚠️ No description entered.")
+                elif choice in special_map:
+                    item = special_map[choice]
+                    if item not in special_items:
+                        special_items.append(item)
+                    else:
+                        print("⚠️ Already added.")
+                else:
+                    print("⚠️ Invalid choice.")
+                if special_items:
+                    print(f"Added so far: {', '.join(special_items)}")
+                print("Any more items needed?")
+        special_info = ", ".join(special_items)
 
         travelers.append({
             "type": "child",
@@ -403,6 +436,7 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         print("🌤️ Fetching weather forecast...")
         weather = get_weather(loc_data["latitude"], loc_data["longitude"], departure, return_date)
 
+def build_packing_list(duration, travelers, is_international, laundry, weather):
     packing = build_weather_section(weather)
 
     clothing = get_clothing(weather, duration, travelers, laundry)
@@ -477,6 +511,22 @@ def packing_list(departure, return_date, duration, destination, travelers, is_in
         packing.append("  🔌 Travel adapter/converter")
         packing.append("  📋 Copies of important documents")
         packing.append("  🗺️ Travel insurance documents")
+
+    return packing
+
+def packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry):
+    print("\nPacking List Result [Step 4/4]")
+    print("------------------------------")
+    print(f"Here is your packing list for your trip to {destination}!")
+    print(f"Trip duration: {duration} days")
+    print()
+
+    weather = None
+    if loc_data and loc_data.get("latitude") is not None and loc_data.get("longitude") is not None:
+        print("🌤️ Fetching weather forecast...")
+        weather = get_weather(loc_data["latitude"], loc_data["longitude"], departure, return_date)
+
+    packing = build_packing_list(duration, travelers, is_international, laundry, weather)
 
     print("Your Packing List:")
     print("-" * 30)
