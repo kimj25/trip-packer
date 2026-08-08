@@ -424,17 +424,6 @@ def traveler_profile(departure, return_date, duration, destination, is_internati
     else:
         packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry)
 
-def packing_list(departure, return_date, duration, destination, travelers, is_international, loc_data, laundry):
-    print("\nPacking List Result [Step 4/4]")
-    print("------------------------------")
-    print(f"Here is your packing list for your trip to {destination}!")
-    print(f"Trip duration: {duration} days")
-    print()
-
-    weather = None
-    if loc_data and loc_data.get("latitude") is not None and loc_data.get("longitude") is not None:
-        print("🌤️ Fetching weather forecast...")
-        weather = get_weather(loc_data["latitude"], loc_data["longitude"], departure, return_date)
 
 def build_packing_list(duration, travelers, is_international, laundry, weather):
     packing = build_weather_section(weather)

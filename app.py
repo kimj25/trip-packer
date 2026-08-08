@@ -58,22 +58,24 @@ with st.sidebar:
 # ---------- cached service calls ----------
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def cached_location(destination):
-    return get_location(destination)
+def cached_location(dest):
+    return get_location(dest)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def cached_weather(latitude, longitude, departure, return_date):
-    return get_weather(latitude, longitude, departure, return_date)
+def cached_weather(lat, lon, dep, ret):
+    return get_weather(lat, lon, dep, ret)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def cached_packing(duration, travelers_tuple, is_international, laundry, weather):
-    travelers = [
+def cached_packing(trip_duration, traveler_tuples, is_intl, laundry_opt, weather_data):
+    traveler_list = [
         {"type": t[0], "age": t[1], "sex": t[2], "dietary": t[3], "special": t[4]}
-        for t in travelers_tuple
+        for t in traveler_tuples
     ]
-    return build_packing_list(duration, travelers, is_international, laundry, weather)
+    return build_packing_list(
+        trip_duration, traveler_list, is_intl, laundry_opt, weather_data
+    )
 
 
 # ---------- session state ----------
@@ -87,19 +89,19 @@ def go(step):
     st.rerun()
 
 
-def append_saved_trip(destination, departure, return_date, packing):
-    with open(SAVED_FILE, "a", encoding="utf-8") as f:
-        f.write("===\n")
-        f.write(f"destination={destination}\n")
-        f.write(f"departure={departure}\n")
-        f.write(f"return={return_date}\n")
-        f.write(f"items={'^'.join(packing)}\n")
+def append_saved_trip(dest, dep, ret, pack_items):
+    with open(SAVED_FILE, "a", encoding="utf-8") as fh:
+        fh.write("===\n")
+        fh.write(f"destination={dest}\n")
+        fh.write(f"departure={dep}\n")
+        fh.write(f"return={ret}\n")
+        fh.write(f"items={'^'.join(pack_items)}\n")
 
 
-def do_save(destination, departure, return_date, packing):
-    append_saved_trip(destination, departure, return_date, packing)
+def do_save(dest, dep, ret, pack_items):
+    append_saved_trip(dest, dep, ret, pack_items)
     st.session_state["saved_msg"] = (
-        f"Saved {destination} to saved_trips.txt"
+        f"Saved {dest} to saved_trips.txt"
     )
 
 
@@ -112,19 +114,19 @@ CHILD_SPECIAL_OPTIONS = [
 ]
 
 
-def add_special_item(i):
-    items = st.session_state.setdefault(f"c_special_{i}", [])
-    choice = st.session_state.get(f"c_spec_select_{i}", "")
-    if choice == "Other":
-        custom = st.session_state.get(f"c_spec_other_{i}", "").strip()
+def add_special_item(child_idx):
+    items = st.session_state.setdefault(f"c_special_{child_idx}", [])
+    chosen = st.session_state.get(f"c_spec_select_{child_idx}", "")
+    if chosen == "Other":
+        custom = st.session_state.get(f"c_spec_other_{child_idx}", "").strip()
         if custom:
             items.append(custom)
-    elif choice and choice not in items:
-        items.append(choice)
+    elif chosen and chosen not in items:
+        items.append(chosen)
 
 
-def undo_special_item(i):
-    items = st.session_state.get(f"c_special_{i}", [])
+def undo_special_item(child_idx):
+    items = st.session_state.get(f"c_special_{child_idx}", [])
     if items:
         items.pop()
 
